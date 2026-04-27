@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import ReactMarkdown from "react-markdown";
 import "./App.css";
 import {
     destinations,
@@ -6,6 +7,7 @@ import {
     features,
     testimonials,
     chatMessages,
+    LLM_MODELS,
 } from "./data";
 
 export default function LandingPage() {
@@ -14,7 +16,64 @@ export default function LandingPage() {
     const [chatVisible, setChatVisible] = useState(false);
     const [visibleMsgs, setVisibleMsgs] = useState(1);
     const [heroVisible, setHeroVisible] = useState(false);
+    const [selectedModel, setSelectedModel] = useState(LLM_MODELS[1]);
+    const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+    const [messages, setMessages] = useState([]);
+    const [loading, setLoading] = useState(false);
     const chatRef = useRef(null);
+    const modelSelectorRef = useRef(null);
+    const heroThreadRef = useRef(null);
+
+    const handleLLMCall = async () => {
+        if (!query.trim() || loading) return;
+        const userText = query.trim();
+        setMessages((prev) => [...prev, { role: "user", text: userText }]);
+        setQuery("");
+        setLoading(true);
+        try {
+            const response = await fetch("http://localhost:5000/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    query: userText,
+                    model_id: selectedModel.id,
+                }),
+            });
+            const data = await response.json();
+            setMessages((prev) => [
+                ...prev,
+                { role: "ai", text: data.response },
+            ]);
+        } catch {
+            setMessages((prev) => [
+                ...prev,
+                { role: "ai", text: "Something went wrong. Please try again." },
+            ]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (heroThreadRef.current) {
+            heroThreadRef.current.scrollTop =
+                heroThreadRef.current.scrollHeight;
+        }
+    }, [messages, loading]);
+
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (
+                modelSelectorRef.current &&
+                !modelSelectorRef.current.contains(e.target)
+            ) {
+                setModelDropdownOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () =>
+            document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
 
     useEffect(() => {
         const t = setTimeout(() => setHeroVisible(true), 100);
@@ -103,9 +162,73 @@ export default function LandingPage() {
                                 className="search-input"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                placeholder='Try "10 days in Japan under $3000"'
+                                onKeyDown={(e) =>
+                                    e.key === "Enter" && handleLLMCall()
+                                }
+                                placeholder={
+                                    messages.length > 0
+                                        ? "Ask a follow-up..."
+                                        : 'Try "10 days in Japan under $3000"'
+                                }
                             />
-                            <button className="cta-btn cta-btn--search">
+                            <div className="model-selector-divider" />
+                            <div
+                                className="model-selector"
+                                ref={modelSelectorRef}
+                            >
+                                <button
+                                    className={`model-selector-trigger${modelDropdownOpen ? " model-selector-trigger--open" : ""}`}
+                                    onClick={() =>
+                                        setModelDropdownOpen((o) => !o)
+                                    }
+                                >
+                                    <span className="model-selector-icon">
+                                        {selectedModel.icon}
+                                    </span>
+                                    <span>{selectedModel.shortName}</span>
+                                    <span
+                                        className={`model-selector-chevron${modelDropdownOpen ? " model-selector-chevron--open" : ""}`}
+                                    >
+                                        ▾
+                                    </span>
+                                </button>
+                                {modelDropdownOpen && (
+                                    <div className="model-dropdown">
+                                        {LLM_MODELS.map((model) => (
+                                            <button
+                                                key={model.id}
+                                                className={`model-option${selectedModel.id === model.id ? " model-option--active" : ""}`}
+                                                onClick={() => {
+                                                    setSelectedModel(model);
+                                                    setModelDropdownOpen(false);
+                                                }}
+                                            >
+                                                <span className="model-option-icon">
+                                                    {model.icon}
+                                                </span>
+                                                <div>
+                                                    <div className="model-option-name">
+                                                        {model.name}
+                                                    </div>
+                                                    <div className="model-option-provider">
+                                                        {model.provider}
+                                                    </div>
+                                                </div>
+                                                {selectedModel.id ===
+                                                    model.id && (
+                                                    <span className="model-option-check">
+                                                        ✓
+                                                    </span>
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                onClick={handleLLMCall}
+                                className="cta-btn cta-btn--search"
+                            >
                                 Plan my trip →
                             </button>
                         </div>
@@ -121,6 +244,47 @@ export default function LandingPage() {
                                 </button>
                             ))}
                         </div>
+                        {(messages.length > 0 || loading) && (
+                            <div className="hero-thread" ref={heroThreadRef}>
+                                {messages.map((msg, i) => (
+                                    <div
+                                        key={i}
+                                        className={`hero-thread-msg${msg.role === "user" ? " hero-thread-msg--user" : ""}`}
+                                    >
+                                        {msg.role === "ai" && (
+                                            <div className="hero-thread-avatar">
+                                                ✦
+                                            </div>
+                                        )}
+                                        <div
+                                            className={`hero-thread-bubble hero-thread-bubble--${msg.role}`}
+                                        >
+                                            {msg.role === "ai" ? (
+                                                <div className="md">
+                                                    <ReactMarkdown>
+                                                        {msg.text}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            ) : (
+                                                msg.text
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                {loading && (
+                                    <div className="hero-thread-msg">
+                                        <div className="hero-thread-avatar">
+                                            ✦
+                                        </div>
+                                        <div className="hero-thread-bubble hero-thread-bubble--ai hero-thread-typing">
+                                            <span className="ai-reply-dot" />
+                                            <span className="ai-reply-dot" />
+                                            <span className="ai-reply-dot" />
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

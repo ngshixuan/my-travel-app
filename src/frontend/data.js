@@ -119,3 +119,20 @@ export const chatMessages = [
         pill: "📋 View your Bali itinerary",
     },
 ];
+
+export const LLM_MODELS = [
+    {
+        id: "claude",
+        name: "Claude Sonnet 4.6",
+        shortName: "Sonnet 4.6",
+        provider: "Anthropic",
+        icon: "◆",
+    },
+    {
+        id: "gemini",
+        name: "Gemini 3.0 Flash",
+        shortName: "Gemini 3 Flash",
+        provider: "Google",
+        icon: "✦",
+    },
+];
