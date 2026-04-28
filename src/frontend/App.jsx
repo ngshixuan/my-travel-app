@@ -23,6 +23,7 @@ export default function LandingPage() {
     const chatRef = useRef(null);
     const modelSelectorRef = useRef(null);
     const heroThreadRef = useRef(null);
+    const sessionId = useRef(crypto.randomUUID());
 
     const handleLLMCall = async () => {
         if (!query.trim() || loading) return;
@@ -37,6 +38,7 @@ export default function LandingPage() {
                 body: JSON.stringify({
                     query: userText,
                     model_id: selectedModel.id,
+                    session_id: sessionId.current,
                 }),
             });
             const data = await response.json();

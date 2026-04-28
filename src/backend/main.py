@@ -1,10 +1,11 @@
 import os
+import sqlite3
 from dotenv import load_dotenv
 from openai import OpenAI
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+from database import init_db
 
-load_dotenv(override=True)
 
 SYSTEM_PROMPT = """
 You are the wander.ai travel agent — a knowledgeable, warm, and highly personalised trip-planning assistant.
@@ -40,6 +41,8 @@ For follow-up questions or refinements, respond conversationally — no need to 
 - If the user's budget is very tight for their chosen destination, flag it honestly and suggest alternatives.
 """.strip()
 
+load_dotenv(override=True)
+
 google_api_key = os.getenv('GEMINI_API_KEY')
 anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
 
@@ -59,23 +62,43 @@ else:
 gemini = OpenAI(base_url=google_base_url, api_key=google_api_key)
 claude = OpenAI(base_url=anthropic_base_url, api_key=anthropic_api_key)
 
+DB = 'travel.db'
+
+init_db(DB)
+
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173"])
 
 @app.route("/chat", methods=['POST'])
-
 def handle_chat_request():
     body = request.get_json()
     query = body.get("query", "").strip()
     model_id = body.get("model_id", "claude")
+    session_id = body.get("session_id", "")
 
     if not query:
         return jsonify({"error": "query is required"}), 400
     
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": query}
+        {"role": "system", "content": SYSTEM_PROMPT}
     ]
+
+    conn = sqlite3.connect(DB)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT user_query, ai_response FROM chat_history
+        WHERE session_id = ?
+        ORDER BY created_at ASC LIMIT 10
+    """, (session_id,))
+
+    past_chats = cursor.fetchall()
+
+    for past_query, past_response in past_chats:
+        messages.append({"role": "user", "content": past_query})
+        messages.append({"role": "assistant", "content": past_response})
+
+    messages.append({"role": "user", "content": query})
 
     try:
         if 'gemini' in model_id:
@@ -84,8 +107,18 @@ def handle_chat_request():
             response = claude.chat.completions.create(model="claude-sonnet-4-6", messages=messages)
 
         content = response.choices[0].message.content
+
+        cursor.execute(
+            "INSERT INTO chat_history (session_id, user_query, ai_response, model_id) VALUES (?, ?, ?, ?)", 
+            (session_id, query, content, model_id)
+        )
+        conn.commit()
+        conn.close()
+
         return jsonify({"response": content})
     except Exception as e:
+        if conn:
+            conn.close()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
