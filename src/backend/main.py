@@ -1,11 +1,12 @@
 import os
 import sqlite3
+from datetime import date
 from dotenv import load_dotenv
 from openai import OpenAI
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from database import init_db
-
+from tools import price_function, handle_get_ticket_details
 
 SYSTEM_PROMPT = """
 You are the wander.ai travel agent — a knowledgeable, warm, and highly personalised trip-planning assistant.
@@ -66,6 +67,10 @@ DB = 'travel.db'
 
 init_db(DB)
 
+tools = [
+    {"type": "function", "function": price_function},
+]
+
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:5173"])
 
@@ -80,7 +85,7 @@ def handle_chat_request():
         return jsonify({"error": "query is required"}), 400
     
     messages = [
-        {"role": "system", "content": SYSTEM_PROMPT}
+        {"role": "system", "content": f"{SYSTEM_PROMPT}\n\nToday's date is {date.today().isoformat()}."}
     ]
 
     conn = sqlite3.connect(DB)
@@ -100,12 +105,21 @@ def handle_chat_request():
 
     messages.append({"role": "user", "content": query})
 
-    try:
+    def complete(msgs):
         if 'gemini' in model_id:
-            response = gemini.chat.completions.create(model="gemini-3-flash-preview", messages=messages)
-        else:
-            response = claude.chat.completions.create(model="claude-sonnet-4-6", messages=messages)
+            return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools)
+        return claude.chat.completions.create(model="claude-sonnet-4-6", messages=msgs, tools=tools)
 
+    try:
+        response = complete(messages)
+
+        while response.choices[0].finish_reason == "tool_calls":
+            message = response.choices[0].message
+            responses = handle_get_ticket_details(message)
+            messages.append(message)
+            messages.extend(responses)
+            response = complete(messages)
+        
         content = response.choices[0].message.content
 
         cursor.execute(
