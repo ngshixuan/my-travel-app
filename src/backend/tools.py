@@ -1,11 +1,13 @@
 import serpapi
 import os
 import json
+import requests
 from dotenv import load_dotenv
 
 load_dotenv(override=True)
 
 serp_api_key = os.getenv('SERP_API_KEY')
+weather_api_key = os.getenv('WEATHER_API_KEY')
 
 price_function = {
     "name": "get_ticket_details",
@@ -40,7 +42,27 @@ price_function = {
     },
 }
 
-def handle_get_ticket_details(message):
+weather_function = {
+    "name": "get_weather",
+    "description": "Get the weather and condition for a specific city on a specific date.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "city": {
+                "type": "string",
+                "description": "The name of the city to get the weather for (e.g., Tokyo, Paris, New York).",
+            },
+            "date": {
+                "type": "string",
+                "description": "The date for the weather forecast in yyyy-MM-dd format (e.g., 2026-06-15).",
+            }
+        },
+        "required": ["city", "date"],
+        "additionalProperties": False,
+    },
+}
+
+def handle_tool_calls(message):
     responses = []
     for tool_call in message.tool_calls:
         if tool_call.function.name == "get_ticket_details":
@@ -57,12 +79,24 @@ def handle_get_ticket_details(message):
                 "content": ticket_details,
                 "tool_call_id": tool_call.id
             })
+
+        elif tool_call.function.name == 'get_weather':
+            arguments= json.loads(tool_call.function.arguments)
+            city = arguments.get('city')
+            date = arguments.get('date')
+
+            weather = get_weather(city, date)
+            responses.append({
+                "role": "tool",
+                "content": weather,
+                "tool_call_id": tool_call.id
+            })
     return responses
 
 def get_ticket_details(origin_city, destination_city, outbound_date, return_date, trip_type):
     trip_type = trip_type or "1"
     
-    print(f"Tool called for city {origin_city} to {destination_city} and {trip_type}")
+    print(f"Tool called for city {origin_city} to {destination_city} and {trip_type} at {outbound_date}")
 
     if not serp_api_key:
         return json.dumps({"error": "SERP_API_KEY is not configured"})
@@ -94,3 +128,32 @@ def get_ticket_details(origin_city, destination_city, outbound_date, return_date
     arrival_airport = best["flights"][-1]["arrival_airport"]["name"]
 
     return json.dumps({"price": price, "departure_airport": departure_airport, "arrival_airport": arrival_airport})
+
+def get_weather(city, date):
+
+    print(f"Tool called to get weather for {city} at {date}")
+
+    url = f"http://api.weatherapi.com/v1/future.json?key={weather_api_key}&q={city}&dt={date}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        return json.dumps({"error": f"Could not find weather for {city}"})
+
+    data = response.json()
+
+    print(data)
+
+    location_name = data["location"]["name"]
+    country = data["location"]["country"]
+
+    day = data["forecast"]["forecastday"][0]["day"]
+    temp_c = day["avgtemp_c"]
+    temp_f = day["avgtemp_f"]
+    condition = day["condition"]["text"]
+
+    return json.dumps({
+        "location": f"{location_name}, {country}",
+        "temperature_celsius": temp_c,
+        "temperature_fahrenheit": temp_f,
+        "condition": condition
+    })
