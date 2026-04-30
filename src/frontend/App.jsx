@@ -23,7 +23,6 @@ export default function LandingPage() {
     const chatRef = useRef(null);
     const modelSelectorRef = useRef(null);
     const heroThreadRef = useRef(null);
-    const sessionId = useRef(crypto.randomUUID());
 
     const handleLLMCall = async () => {
         if (!query.trim() || loading) return;
@@ -38,7 +37,7 @@ export default function LandingPage() {
                 body: JSON.stringify({
                     query: userText,
                     model_id: selectedModel.id,
-                    session_id: sessionId.current,
+                    history: messages,
                 }),
             });
             const data = await response.json();
@@ -126,35 +125,78 @@ export default function LandingPage() {
             {/* HERO */}
             <section className="hero-section">
                 <div>
-                    <div
-                        className={`fade-up ${heroVisible ? "visible" : ""}`}
-                        style={{ transitionDelay: "0ms" }}
-                    >
-                        <span className="hero-badge">
-                            AI-powered travel planning
-                        </span>
-                    </div>
-                    <div
-                        className={`fade-up ${heroVisible ? "visible" : ""}`}
-                        style={{ transitionDelay: "100ms" }}
-                    >
-                        <h1 className="hero-title">
-                            Your next trip,{" "}
-                            <em className="hero-title-em">designed</em>
-                            <br />
-                            just for you.
-                        </h1>
-                    </div>
-                    <div
-                        className={`fade-up ${heroVisible ? "visible" : ""}`}
-                        style={{ transitionDelay: "200ms" }}
-                    >
-                        <p className="hero-subtitle">
-                            Tell us where you dream of going. Our AI builds a
-                            personalised itinerary — flights, hotels, day plans
-                            — in seconds.
-                        </p>
-                    </div>
+                    {messages.length > 0 || loading ? (
+                        <div className="hero-thread" ref={heroThreadRef}>
+                            {messages.map((msg, i) => (
+                                <div
+                                    key={i}
+                                    className={`hero-thread-msg${msg.role === "user" ? " hero-thread-msg--user" : ""}`}
+                                >
+                                    {msg.role === "ai" && (
+                                        <div className="hero-thread-avatar">
+                                            ✦
+                                        </div>
+                                    )}
+                                    <div
+                                        className={`hero-thread-bubble hero-thread-bubble--${msg.role}`}
+                                    >
+                                        {msg.role === "ai" ? (
+                                            <div className="md">
+                                                <ReactMarkdown>
+                                                    {msg.text}
+                                                </ReactMarkdown>
+                                            </div>
+                                        ) : (
+                                            msg.text
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+                            {loading && (
+                                <div className="hero-thread-msg">
+                                    <div className="hero-thread-avatar">✦</div>
+                                    <div className="hero-thread-bubble hero-thread-bubble--ai hero-thread-typing">
+                                        <span className="ai-reply-dot" />
+                                        <span className="ai-reply-dot" />
+                                        <span className="ai-reply-dot" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="headings">
+                            <div
+                                className={`fade-up ${heroVisible ? "visible" : ""}`}
+                                style={{ transitionDelay: "0ms" }}
+                            >
+                                <span className="hero-badge">
+                                    AI-powered travel planning
+                                </span>
+                            </div>
+                            <div
+                                className={`fade-up ${heroVisible ? "visible" : ""}`}
+                                style={{ transitionDelay: "100ms" }}
+                            >
+                                <h1 className="hero-title">
+                                    Your next trip,{" "}
+                                    <em className="hero-title-em">designed</em>
+                                    <br />
+                                    just for you.
+                                </h1>
+                            </div>
+                            <div
+                                className={`fade-up ${heroVisible ? "visible" : ""}`}
+                                style={{ transitionDelay: "200ms" }}
+                            >
+                                <p className="hero-subtitle">
+                                    Tell us where you dream of going. Our AI
+                                    builds a personalised itinerary — flights,
+                                    hotels, day plans — in seconds.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div
                         className={`fade-up ${heroVisible ? "visible" : ""}`}
                         style={{ transitionDelay: "300ms" }}
@@ -231,7 +273,9 @@ export default function LandingPage() {
                                 onClick={handleLLMCall}
                                 className="cta-btn cta-btn--search"
                             >
-                                Plan my trip →
+                                {messages.length > 0
+                                    ? "Send"
+                                    : "Plan my trip →"}
                             </button>
                         </div>
                         <div className="chip-row">
@@ -246,47 +290,6 @@ export default function LandingPage() {
                                 </button>
                             ))}
                         </div>
-                        {(messages.length > 0 || loading) && (
-                            <div className="hero-thread" ref={heroThreadRef}>
-                                {messages.map((msg, i) => (
-                                    <div
-                                        key={i}
-                                        className={`hero-thread-msg${msg.role === "user" ? " hero-thread-msg--user" : ""}`}
-                                    >
-                                        {msg.role === "ai" && (
-                                            <div className="hero-thread-avatar">
-                                                ✦
-                                            </div>
-                                        )}
-                                        <div
-                                            className={`hero-thread-bubble hero-thread-bubble--${msg.role}`}
-                                        >
-                                            {msg.role === "ai" ? (
-                                                <div className="md">
-                                                    <ReactMarkdown>
-                                                        {msg.text}
-                                                    </ReactMarkdown>
-                                                </div>
-                                            ) : (
-                                                msg.text
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                                {loading && (
-                                    <div className="hero-thread-msg">
-                                        <div className="hero-thread-avatar">
-                                            ✦
-                                        </div>
-                                        <div className="hero-thread-bubble hero-thread-bubble--ai hero-thread-typing">
-                                            <span className="ai-reply-dot" />
-                                            <span className="ai-reply-dot" />
-                                            <span className="ai-reply-dot" />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
                     </div>
                 </div>
 

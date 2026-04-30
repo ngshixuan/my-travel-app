@@ -1,11 +1,9 @@
 import os
-import sqlite3
 from datetime import date
 from dotenv import load_dotenv
 from openai import OpenAI
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from database import init_db
 from tools import price_function, weather_function, handle_tool_calls
 
 SYSTEM_PROMPT = """
@@ -73,10 +71,6 @@ else:
 gemini = OpenAI(base_url=google_base_url, api_key=google_api_key)
 claude = OpenAI(base_url=anthropic_base_url, api_key=anthropic_api_key)
 
-DB = 'travel.db'
-
-init_db(DB)
-
 tools = [
     {"type": "function", "function": price_function},
     {"type": "function", "function": weather_function}
@@ -90,29 +84,18 @@ def handle_chat_request():
     body = request.get_json()
     query = body.get("query", "").strip()
     model_id = body.get("model_id", "claude")
-    session_id = body.get("session_id", "")
+    history = body.get("history", [])
 
     if not query:
         return jsonify({"error": "query is required"}), 400
-    
+
     messages = [
         {"role": "system", "content": f"{SYSTEM_PROMPT}\n\nToday's date is {date.today().isoformat()}."}
     ]
 
-    conn = sqlite3.connect(DB)
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        SELECT user_query, ai_response FROM chat_history
-        WHERE session_id = ?
-        ORDER BY created_at ASC LIMIT 10
-    """, (session_id,))
-
-    past_chats = cursor.fetchall()
-
-    for past_query, past_response in past_chats:
-        messages.append({"role": "user", "content": past_query})
-        messages.append({"role": "assistant", "content": past_response})
+    for msg in history:
+        role = "user" if msg["role"] == "user" else "assistant"
+        messages.append({"role": role, "content": msg["text"]})
 
     messages.append({"role": "user", "content": query})
 
@@ -130,20 +113,10 @@ def handle_chat_request():
             messages.append(message)
             messages.extend(responses)
             response = complete(messages)
-        
+
         content = response.choices[0].message.content
-
-        cursor.execute(
-            "INSERT INTO chat_history (session_id, user_query, ai_response, model_id) VALUES (?, ?, ?, ?)", 
-            (session_id, query, content, model_id)
-        )
-        conn.commit()
-        conn.close()
-
         return jsonify({"response": content})
     except Exception as e:
-        if conn:
-            conn.close()
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":

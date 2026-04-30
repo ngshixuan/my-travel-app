@@ -141,8 +141,6 @@ def get_weather(city, date):
 
     data = response.json()
 
-    print(data)
-
     location_name = data["location"]["name"]
     country = data["location"]["country"]
 
