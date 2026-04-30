@@ -276,7 +276,7 @@ nav {
 .hero-price-badge {
     position: absolute;
     top: 24px;
-    left: 24px;
+    right: 24px;
     background: #fff;
     border-radius: 12px;
     padding: 10px 16px;
