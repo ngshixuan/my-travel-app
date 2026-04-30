@@ -20,6 +20,21 @@ export default function LandingPage() {
     const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [heroCard, setHeroCard] = useState({
+        city: "Kyoto",
+        country: "Japan",
+        emoji: "⛩️",
+        days: 12,
+        tags: ["Temples", "Cuisine", "Gardens"],
+        highlights: [
+            { day: "Day 1–2", activity: "Fushimi Inari & Gion" },
+            { day: "Day 3–4", activity: "Arashiyama & tea ceremony" },
+            { day: "Day 5", activity: "Nishiki Market food tour" },
+            { day: "Day 6–8", activity: "Philosopher's Path & Nanzenji" },
+            { day: "Day 9–12", activity: "Day trip to Nara & Osaka" },
+        ],
+        budget: "$2,840",
+    });
     const chatRef = useRef(null);
     const modelSelectorRef = useRef(null);
     const heroThreadRef = useRef(null);
@@ -31,7 +46,8 @@ export default function LandingPage() {
         setQuery("");
         setLoading(true);
         try {
-            const response = await fetch("http://localhost:5000/chat", {
+            const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+            const response = await fetch(`${apiUrl}/chat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
@@ -45,6 +61,7 @@ export default function LandingPage() {
                 ...prev,
                 { role: "ai", text: data.response },
             ]);
+            if (data.card) setHeroCard(data.card);
         } catch {
             setMessages((prev) => [
                 ...prev,
@@ -300,51 +317,41 @@ export default function LandingPage() {
                 >
                     {/* Main card */}
                     <div className="hero-main-card">
-                        <div className="hero-main-card-emoji">⛩️</div>
                         <div>
-                            <div className="hero-card-city">Kyoto</div>
+                            <div className="hero-main-card-emoji">{heroCard.emoji}</div>
+                            <div className="hero-card-city">{heroCard.city}</div>
                             <div className="hero-card-country">
-                                Japan · 12 days
+                                {heroCard.country} · {heroCard.days} days
                             </div>
                             <div className="hero-card-tags">
-                                {["Temples", "Cuisine", "Gardens"].map((t) => (
+                                {heroCard.tags.map((t) => (
                                     <span key={t} className="hero-card-tag">
                                         {t}
                                     </span>
                                 ))}
                             </div>
                         </div>
-                    </div>
-                    {/* Floating AI card */}
-                    <div className="hero-ai-card">
-                        <div className="hero-ai-label">AI generated plan</div>
-                        <div className="hero-ai-items">
-                            {[
-                                { day: "Day 1–2", act: "Fushimi Inari & Gion" },
-                                {
-                                    day: "Day 3–4",
-                                    act: "Arashiyama & tea ceremony",
-                                },
-                                {
-                                    day: "Day 5",
-                                    act: "Nishiki Market food tour",
-                                },
-                            ].map((item) => (
-                                <div key={item.day} className="hero-ai-item">
-                                    <span className="hero-ai-day">
-                                        {item.day}
-                                    </span>
-                                    <span className="hero-ai-activity">
-                                        {item.act}
-                                    </span>
-                                </div>
-                            ))}
+                        <div className="hero-card-divider" />
+                        <div>
+                            <div className="hero-ai-label">AI generated plan</div>
+                            <div className="hero-ai-items">
+                                {heroCard.highlights.map((item) => (
+                                    <div key={item.day} className="hero-ai-item">
+                                        <span className="hero-ai-day">
+                                            {item.day}
+                                        </span>
+                                        <span className="hero-ai-activity">
+                                            {item.activity}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
                     {/* Price badge */}
                     <div className="hero-price-badge">
                         <div className="hero-price-label">estimated budget</div>
-                        <div className="hero-price-value">$2,840</div>
+                        <div className="hero-price-value">{heroCard.budget}</div>
                     </div>
                 </div>
             </section>

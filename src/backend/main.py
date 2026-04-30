@@ -1,4 +1,6 @@
 import os
+import re
+import json
 from datetime import date
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -48,6 +50,11 @@ For follow-up questions or refinements, respond conversationally — no need to 
 - Never invent visa rules or flight prices with false precision — give realistic ranges and recommend the user verify current requirements.
 - If the user's budget is very tight for their chosen destination, flag it honestly and suggest alternatives.
 - Base weather estimates on well-known seasonal patterns for the destination; do not fabricate specific forecasts.
+
+## Card data
+At the end of every new trip plan (not follow-up questions), append exactly one line at the very end in this format — no markdown, no code block, just the raw line:
+TRIP_CARD:{"city":"...","country":"...","emoji":"...","days":7,"tags":["...","...","..."],"highlights":[{"day":"Day 1–2","activity":"..."},{"day":"Day 3–4","activity":"..."},{"day":"Day 5","activity":"..."},{"day":"Day 6–7","activity":"..."},{"day":"Day 8","activity":"..."}],"budget":"$X,XXX"}
+Pick an appropriate single emoji for the destination city.
 """.strip()
 
 load_dotenv(override=True)
@@ -77,7 +84,8 @@ tools = [
 ]
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:5173"])
+cors_origins = os.getenv('FRONTEND_URL', 'http://localhost:5173').split(',')
+CORS(app, origins=cors_origins)
 
 @app.route("/chat", methods=['POST'])
 def handle_chat_request():
@@ -115,9 +123,19 @@ def handle_chat_request():
             response = complete(messages)
 
         content = response.choices[0].message.content
-        return jsonify({"response": content})
+
+        card = None
+        card_match = re.search(r'TRIP_CARD:(\{.*\})', content)
+        if card_match:
+            try:
+                card = json.loads(card_match.group(1))
+                content = content[:card_match.start()].rstrip()
+            except Exception:
+                pass
+
+        return jsonify({"response": content, "card": card})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(port=5000, debug=True)
+    app.run(port=5000, debug=False)
