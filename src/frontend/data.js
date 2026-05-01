@@ -124,7 +124,7 @@ export const LLM_MODELS = [
     {
         id: "claude",
         name: "Claude Haiku 4.5",
-        shortName: "Haiku 4.6",
+        shortName: "Haiku 4.5",
         provider: "Anthropic",
         icon: "◆",
     },
