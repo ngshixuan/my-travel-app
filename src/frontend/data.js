@@ -123,8 +123,8 @@ export const chatMessages = [
 export const LLM_MODELS = [
     {
         id: "claude",
-        name: "Claude Haiku 4.5",
-        shortName: "Haiku 4.5",
+        name: "Claude Sonnet 4.6",
+        shortName: "Sonnet 4.6",
         provider: "Anthropic",
         icon: "◆",
     },

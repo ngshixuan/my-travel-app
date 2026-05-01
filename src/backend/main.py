@@ -72,12 +72,12 @@ def handle_chat_request():
     def complete(msgs):
         if 'gemini' in model_id:
             return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools)
-        return claude.chat.completions.create(model="claude-haiku-4-5", messages=msgs, tools=tools)
+        return claude.chat.completions.create(model="claude-sonnet-4-6", messages=msgs, tools=tools)
 
     def complete_stream(msgs):
         if 'gemini' in model_id:
             return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools, stream=True)
-        return claude.chat.completions.create(model="claude-haiku-4-5", messages=msgs, tools=tools, stream=True)
+        return claude.chat.completions.create(model="claude-sonnet-4-6", messages=msgs, tools=tools, stream=True)
 
     try:
         response = complete(messages)
