@@ -35,9 +35,43 @@ export default function LandingPage() {
         ],
         budget: "$2,840",
     });
+
     const chatRef = useRef(null);
     const modelSelectorRef = useRef(null);
     const heroThreadRef = useRef(null);
+    const searchInputRef = useRef(null);
+
+    const [location, setLocation] = useState(null);
+
+    useEffect(() => {
+        if (!navigator.geolocation) return;
+        navigator.geolocation.getCurrentPosition(async (pos) => {
+            const { latitude: lat, longitude: lng } = pos.coords;
+            try {
+                const res = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
+                    { headers: { "Accept-Language": "en" } },
+                );
+                const data = await res.json();
+                const city =
+                    data.address.city ||
+                    data.address.town ||
+                    data.address.village ||
+                    data.address.state ||
+                    "Unknown";
+                setLocation({ lat, lng, city });
+            } catch {
+                setLocation({ lat, lng });
+            }
+        });
+    }, []);
+
+    useEffect(() => {
+        const el = searchInputRef.current;
+        if (!el) return;
+        el.style.height = "auto";
+        el.style.height = `${el.scrollHeight}px`;
+    }, [query]);
 
     const handleLLMCall = async () => {
         if (!query.trim() || loading) return;
@@ -46,7 +80,8 @@ export default function LandingPage() {
         setQuery("");
         setLoading(true);
         try {
-            const apiUrl = import.meta.env.VITE_API_URL || "http://localhost:5000";
+            const apiUrl =
+                import.meta.env.VITE_API_URL || "http://localhost:5000";
             const response = await fetch(`${apiUrl}/chat`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -54,6 +89,7 @@ export default function LandingPage() {
                     query: userText,
                     model_id: selectedModel.id,
                     history: messages,
+                    location: location,
                 }),
             });
             const data = await response.json();
@@ -219,17 +255,22 @@ export default function LandingPage() {
                         style={{ transitionDelay: "300ms" }}
                     >
                         <div className="hero-search-box">
-                            <input
+                            <textarea
+                                ref={searchInputRef}
+                                rows={1}
                                 className="search-input"
                                 value={query}
                                 onChange={(e) => setQuery(e.target.value)}
-                                onKeyDown={(e) =>
-                                    e.key === "Enter" && handleLLMCall()
-                                }
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter" && !e.shiftKey) {
+                                        e.preventDefault();
+                                        handleLLMCall();
+                                    }
+                                }}
                                 placeholder={
                                     messages.length > 0
                                         ? "Ask a follow-up..."
-                                        : 'Try "10 days in Japan under $3000"'
+                                        : 'Try "10 days in Japan"'
                                 }
                             />
                             <div className="model-selector-divider" />
@@ -318,8 +359,12 @@ export default function LandingPage() {
                     {/* Main card */}
                     <div className="hero-main-card">
                         <div>
-                            <div className="hero-main-card-emoji">{heroCard.emoji}</div>
-                            <div className="hero-card-city">{heroCard.city}</div>
+                            <div className="hero-main-card-emoji">
+                                {heroCard.emoji}
+                            </div>
+                            <div className="hero-card-city">
+                                {heroCard.city}
+                            </div>
                             <div className="hero-card-country">
                                 {heroCard.country} · {heroCard.days} days
                             </div>
@@ -333,10 +378,15 @@ export default function LandingPage() {
                         </div>
                         <div className="hero-card-divider" />
                         <div>
-                            <div className="hero-ai-label">AI generated plan</div>
+                            <div className="hero-ai-label">
+                                AI generated plan
+                            </div>
                             <div className="hero-ai-items">
                                 {heroCard.highlights.map((item) => (
-                                    <div key={item.day} className="hero-ai-item">
+                                    <div
+                                        key={item.day}
+                                        className="hero-ai-item"
+                                    >
                                         <span className="hero-ai-day">
                                             {item.day}
                                         </span>
@@ -351,7 +401,9 @@ export default function LandingPage() {
                     {/* Price badge */}
                     <div className="hero-price-badge">
                         <div className="hero-price-label">estimated budget</div>
-                        <div className="hero-price-value">{heroCard.budget}</div>
+                        <div className="hero-price-value">
+                            {heroCard.budget}
+                        </div>
                     </div>
                 </div>
             </section>

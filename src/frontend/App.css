@@ -155,6 +155,10 @@ nav {
     font-family: "DM Sans", sans-serif;
     background: transparent;
     color: #1a1a18;
+    resize: none;
+    line-height: 1.5;
+    max-height: 120px;
+    overflow-y: hidden;
 }
 .search-input:focus {
     outline: none;
@@ -230,6 +234,7 @@ nav {
 .hero-card-tags {
     display: flex;
     gap: 6px;
+    flex-wrap: wrap;
 }
 .hero-card-tag {
     background: rgba(255, 255, 255, 0.15);
