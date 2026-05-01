@@ -959,6 +959,23 @@ nav {
     margin: 10px 0;
 }
 
+.hero-thread-bubble--ai .md table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 8px 0;
+    font-size: 13px;
+}
+.hero-thread-bubble--ai .md th,
+.hero-thread-bubble--ai .md td {
+    border: 1px solid rgba(0, 0, 0, 0.15);
+    padding: 5px 10px;
+    text-align: left;
+}
+.hero-thread-bubble--ai .md th {
+    background: rgba(0, 0, 0, 0.04);
+    font-weight: 600;
+}
+
 .hero-thread-typing {
     display: flex;
     align-items: center;

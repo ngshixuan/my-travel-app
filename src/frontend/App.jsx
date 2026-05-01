@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import "./App.css";
 import {
     destinations,
@@ -241,7 +242,7 @@ export default function LandingPage() {
                                     >
                                         {msg.role === "ai" ? (
                                             <div className="md">
-                                                <ReactMarkdown>
+                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
                                                     {msg.text}
                                                 </ReactMarkdown>
                                             </div>
