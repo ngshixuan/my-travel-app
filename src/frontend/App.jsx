@@ -92,12 +92,61 @@ export default function LandingPage() {
                     location: location,
                 }),
             });
-            const data = await response.json();
-            setMessages((prev) => [
-                ...prev,
-                { role: "ai", text: data.response },
-            ]);
-            if (data.card) setHeroCard(data.card);
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            let firstToken = true;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop(); // keep incomplete line for next chunk
+
+                for (const line of lines) {
+                    if (!line.startsWith("data: ")) continue;
+                    const data = line.slice(6);
+                    if (data === "[DONE]") break;
+
+                    try {
+                        const parsed = JSON.parse(data);
+                        if (parsed.token !== undefined) {
+                            if (firstToken) {
+                                setLoading(false);
+                                setMessages((prev) => [
+                                    ...prev,
+                                    { role: "ai", text: parsed.token },
+                                ]);
+                                firstToken = false;
+                            } else {
+                                setMessages((prev) => [
+                                    ...prev.slice(0, -1),
+                                    {
+                                        role: "ai",
+                                        text:
+                                            prev[prev.length - 1].text +
+                                            parsed.token,
+                                    },
+                                ]);
+                            }
+                        }
+                        if (parsed.card) setHeroCard(parsed.card);
+                    } catch {
+                        // ignore malformed SSE lines
+                    }
+                }
+            }
+
+            // Fallback: if we never got a token, add an empty message
+            if (firstToken) {
+                setMessages((prev) => [
+                    ...prev,
+                    { role: "ai", text: "" },
+                ]);
+            }
         } catch {
             setMessages((prev) => [
                 ...prev,

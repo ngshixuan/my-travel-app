@@ -4,7 +4,7 @@ import json
 from datetime import date
 from dotenv import load_dotenv
 from openai import OpenAI
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from tools import price_function, weather_function, handle_tool_calls
 from prompts import SYSTEM_PROMPT
@@ -74,6 +74,11 @@ def handle_chat_request():
             return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools)
         return claude.chat.completions.create(model="claude-haiku-4-5", messages=msgs, tools=tools)
 
+    def complete_stream(msgs):
+        if 'gemini' in model_id:
+            return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools, stream=True)
+        return claude.chat.completions.create(model="claude-haiku-4-5", messages=msgs, tools=tools, stream=True)
+
     try:
         response = complete(messages)
 
@@ -84,18 +89,55 @@ def handle_chat_request():
             messages.extend(responses)
             response = complete(messages)
 
-        content = response.choices[0].message.content
+        def generate():
+            full_content = ""
+            sent_up_to = 0
+            marker = "TRIP_CARD:"
+            lookback = len(marker)
 
-        card = None
-        card_match = re.search(r'TRIP_CARD:(\{.*\})', content)
-        if card_match:
-            try:
-                card = json.loads(card_match.group(1))
-                content = content[:card_match.start()].rstrip()
-            except Exception:
-                pass
+            for chunk in complete_stream(messages):
+                delta = chunk.choices[0].delta.content or ""
+                if not delta:
+                    continue
+                full_content += delta
 
-        return jsonify({"response": content, "card": card})
+                trip_card_pos = full_content.find(marker)
+                if trip_card_pos != -1:
+                    # Only send text before the marker
+                    safe_end = trip_card_pos
+                    if sent_up_to < safe_end:
+                        token = full_content[sent_up_to:safe_end].rstrip()
+                        if token:
+                            yield f"data: {json.dumps({'token': token})}\n\n"
+                        sent_up_to = safe_end
+                    # Keep consuming stream to collect full card JSON
+                else:
+                    # Hold back `lookback` chars to avoid splitting the marker across chunks
+                    safe_end = max(sent_up_to, len(full_content) - lookback)
+                    if sent_up_to < safe_end:
+                        yield f"data: {json.dumps({'token': full_content[sent_up_to:safe_end]})}\n\n"
+                        sent_up_to = safe_end
+
+            # Flush any remaining buffered text (when no card)
+            trip_card_pos = full_content.find(marker)
+            if trip_card_pos == -1 and sent_up_to < len(full_content):
+                yield f"data: {json.dumps({'token': full_content[sent_up_to:]})}\n\n"
+
+            # Extract and emit card if present
+            card_match = re.search(r'TRIP_CARD:(\{.*?\})', full_content, re.DOTALL)
+            if card_match:
+                try:
+                    card = json.loads(card_match.group(1))
+                    yield f"data: {json.dumps({'card': card})}\n\n"
+                except Exception:
+                    pass
+
+            yield "data: [DONE]\n\n"
+
+        resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
+        resp.headers["Cache-Control"] = "no-cache"
+        resp.headers["X-Accel-Buffering"] = "no"
+        return resp
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
