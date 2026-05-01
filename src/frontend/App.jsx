@@ -142,10 +142,7 @@ export default function LandingPage() {
 
             // Fallback: if we never got a token, add an empty message
             if (firstToken) {
-                setMessages((prev) => [
-                    ...prev,
-                    { role: "ai", text: "" },
-                ]);
+                setMessages((prev) => [...prev, { role: "ai", text: "" }]);
             }
         } catch {
             setMessages((prev) => [

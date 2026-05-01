@@ -89,48 +89,45 @@ def handle_chat_request():
             messages.extend(responses)
             response = complete(messages)
 
+        # Extract card from the already-fetched non-streaming response
+        full_text = response.choices[0].message.content or ""
+        card = None
+        card_match = re.search(r'TRIP_CARD:(\{.*\})', full_text, re.DOTALL)
+        if card_match:
+            try:
+                card = json.loads(card_match.group(1))
+            except Exception:
+                pass
+
         def generate():
-            full_content = ""
-            sent_up_to = 0
             marker = "TRIP_CARD:"
-            lookback = len(marker)
+            buffer = ""
+            stop_streaming = False
+
+            if card:
+                yield f"data: {json.dumps({'card': card})}\n\n"
 
             for chunk in complete_stream(messages):
+                if stop_streaming:
+                    break
                 delta = chunk.choices[0].delta.content or ""
                 if not delta:
                     continue
-                full_content += delta
 
-                trip_card_pos = full_content.find(marker)
-                if trip_card_pos != -1:
-                    # Only send text before the marker
-                    safe_end = trip_card_pos
-                    if sent_up_to < safe_end:
-                        token = full_content[sent_up_to:safe_end].rstrip()
-                        if token:
-                            yield f"data: {json.dumps({'token': token})}\n\n"
-                        sent_up_to = safe_end
-                    # Keep consuming stream to collect full card JSON
-                else:
-                    # Hold back `lookback` chars to avoid splitting the marker across chunks
-                    safe_end = max(sent_up_to, len(full_content) - lookback)
-                    if sent_up_to < safe_end:
-                        yield f"data: {json.dumps({'token': full_content[sent_up_to:safe_end]})}\n\n"
-                        sent_up_to = safe_end
+                buffer += delta
+                pos = buffer.find(marker)
+                if pos != -1:
+                    text_before = buffer[:pos]
+                    if text_before:
+                        yield f"data: {json.dumps({'token': text_before})}\n\n"
+                    stop_streaming = True
+                elif len(buffer) > len(marker):
+                    safe = buffer[:-len(marker)]
+                    yield f"data: {json.dumps({'token': safe})}\n\n"
+                    buffer = buffer[-len(marker):]
 
-            # Flush any remaining buffered text (when no card)
-            trip_card_pos = full_content.find(marker)
-            if trip_card_pos == -1 and sent_up_to < len(full_content):
-                yield f"data: {json.dumps({'token': full_content[sent_up_to:]})}\n\n"
-
-            # Extract and emit card if present
-            card_match = re.search(r'TRIP_CARD:(\{.*?\})', full_content, re.DOTALL)
-            if card_match:
-                try:
-                    card = json.loads(card_match.group(1))
-                    yield f"data: {json.dumps({'card': card})}\n\n"
-                except Exception:
-                    pass
+            if not stop_streaming and buffer:
+                yield f"data: {json.dumps({'token': buffer})}\n\n"
 
             yield "data: [DONE]\n\n"
 
