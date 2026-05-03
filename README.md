@@ -16,15 +16,15 @@ An AI-powered travel planning web app that generates personalized day-by-day iti
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | React 19, Vite, React Markdown |
-| Backend | Python Flask, Flask-CORS |
-| AI | Anthropic Claude API, Google Gemini API |
-| Flight data | SerpAPI |
-| Weather | WeatherAPI |
-| Geolocation | OpenStreetMap Nominatim |
-| Production | Gunicorn |
+| Layer       | Technology                              |
+| ----------- | --------------------------------------- |
+| Frontend    | React 19, Vite, React Markdown          |
+| Backend     | Python Flask, Flask-CORS                |
+| AI          | Anthropic Claude API, Google Gemini API |
+| Flight data | SerpAPI                                 |
+| Weather     | WeatherAPI                              |
+| Geolocation | OpenStreetMap Nominatim                 |
+| Production  | Gunicorn                                |
 
 ## Project Structure
 
@@ -105,12 +105,12 @@ VITE_API_URL=http://localhost:5000
 
 ## API Keys
 
-| Key | Where to get it |
-|---|---|
+| Key                 | Where to get it                                        |
+| ------------------- | ------------------------------------------------------ |
 | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
-| `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
-| `SERP_API_KEY` | [serpapi.com](https://serpapi.com) |
-| `WEATHER_API_KEY` | [weatherapi.com](https://www.weatherapi.com) |
+| `GEMINI_API_KEY`    | [aistudio.google.com](https://aistudio.google.com)     |
+| `SERP_API_KEY`      | [serpapi.com](https://serpapi.com)                     |
+| `WEATHER_API_KEY`   | [weatherapi.com](https://www.weatherapi.com)           |
 
 ## Scripts
 
