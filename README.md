@@ -1,16 +1,30 @@
-# React + Vite
+# wander.ai
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An AI-powered travel planning web app that generates personalized day-by-day itineraries in seconds — complete with real-time flight prices, weather forecasts, and budget breakdowns.
 
-Currently, two official plugins are available:
+![React](https://img.shields.io/badge/React-19-blue?logo=react) ![Flask](https://img.shields.io/badge/Flask-3.1-lightgrey?logo=flask) ![Claude](https://img.shields.io/badge/Claude-Sonnet_4.6-orange) ![Gemini](https://img.shields.io/badge/Gemini-3.0_Flash-blue?logo=google)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **AI itinerary generation** — instant 5–7 day trip plans with day-by-day activities, local tips, and highlights
+- **Real-time flight pricing** — live ticket data via SerpAPI based on your current location
+- **Weather forecasts** — destination weather integrated directly into trip plans
+- **Budget breakdowns** — cost estimates for flights, accommodation, food, and activities
+- **Multi-model support** — switch between Claude Sonnet 4.6 and Gemini 3.0 Flash
+- **Streaming responses** — real-time AI output via Server-Sent Events
+- **Geolocation detection** — automatically infers your departure city
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, React Markdown |
+| Backend | Python Flask, Flask-CORS |
+| AI | Anthropic Claude API, Google Gemini API |
+| Flight data | SerpAPI |
+| Weather | WeatherAPI |
+| Geolocation | OpenStreetMap Nominatim |
+| Production | Gunicorn |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Project Structure
+
