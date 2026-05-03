@@ -7,7 +7,7 @@ An AI-powered travel planning web app that generates personalized day-by-day iti
 ## Features
 
 - **AI itinerary generation** — instant 5–7 day trip plans with day-by-day activities, local tips, and highlights
-- **Real-time flight pricing** — live ticket data via SerpAPI based on your current location
+- **Real-time flight pricing** — live ticket data via Google Flights API based on your current location
 - **Weather forecasts** — destination weather integrated directly into trip plans
 - **Budget breakdowns** — cost estimates for flights, accommodation, food, and activities
 - **Multi-model support** — switch between Claude Sonnet 4.6 and Gemini 3.0 Flash
@@ -21,7 +21,7 @@ An AI-powered travel planning web app that generates personalized day-by-day iti
 | Frontend    | React 19, Vite, React Markdown          |
 | Backend     | Python Flask, Flask-CORS                |
 | AI          | Anthropic Claude API, Google Gemini API |
-| Flight data | SerpAPI                                 |
+| Flight data | Google Flights API via SerpAPI          |
 | Weather     | WeatherAPI                              |
 | Geolocation | OpenStreetMap Nominatim                 |
 | Production  | Gunicorn                                |
