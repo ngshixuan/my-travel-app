@@ -1,16 +1,138 @@
-# React + Vite
+# wander.ai
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An AI-powered travel planning web app that generates personalized day-by-day itineraries in seconds — complete with real-time flight prices, weather forecasts, and budget breakdowns.
 
-Currently, two official plugins are available:
+![React](https://img.shields.io/badge/React-19-blue?logo=react) ![Flask](https://img.shields.io/badge/Flask-3.1-lightgrey?logo=flask) ![Claude](https://img.shields.io/badge/Claude-Sonnet_4.6-orange) ![Gemini](https://img.shields.io/badge/Gemini-3.0_Flash-blue?logo=google)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Features
 
-## React Compiler
+- **AI itinerary generation** — instant 5–7 day trip plans with day-by-day activities, local tips, and highlights
+- **Real-time flight pricing** — live ticket data via SerpAPI based on your current location
+- **Weather forecasts** — destination weather integrated directly into trip plans
+- **Budget breakdowns** — cost estimates for flights, accommodation, food, and activities
+- **Multi-model support** — switch between Claude Sonnet 4.6 and Gemini 3.0 Flash
+- **Streaming responses** — real-time AI output via Server-Sent Events
+- **Geolocation detection** — automatically infers your departure city
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Tech Stack
 
-## Expanding the ESLint configuration
+| Layer | Technology |
+|---|---|
+| Frontend | React 19, Vite, React Markdown |
+| Backend | Python Flask, Flask-CORS |
+| AI | Anthropic Claude API, Google Gemini API |
+| Flight data | SerpAPI |
+| Weather | WeatherAPI |
+| Geolocation | OpenStreetMap Nominatim |
+| Production | Gunicorn |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Project Structure
+
+```
+my-travel-app/
+├── src/
+│   ├── main.jsx
+│   ├── frontend/
+│   │   ├── App.jsx         # Main UI (hero, chat, destinations)
+│   │   ├── App.css
+│   │   └── data.js         # Static data (destinations, models, chips)
+│   └── backend/
+│       ├── main.py         # Flask server & /chat endpoint
+│       ├── prompts.py      # AI system prompt
+│       ├── tools.py        # Tool definitions (flights, weather)
+│       └── requirements.txt
+├── index.html
+├── vite.config.js
+└── package.json
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js 18+
+- Python 3.10+
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/ngshixuan/my-travel-app.git
+cd my-travel-app
+```
+
+### 2. Set up the backend
+
+```bash
+cd src/backend
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # macOS/Linux
+pip install -r requirements.txt
+```
+
+Create `src/backend/.env`:
+
+```env
+ANTHROPIC_API_KEY=your_anthropic_api_key
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai/
+SERP_API_KEY=your_serpapi_key
+WEATHER_API_KEY=your_weatherapi_key
+FRONTEND_URL=http://localhost:5173
+```
+
+Start the Flask server:
+
+```bash
+python main.py
+# Runs on http://localhost:5000
+```
+
+### 3. Set up the frontend
+
+```bash
+# From the project root
+npm install
+npm run dev
+# Runs on http://localhost:5173
+```
+
+Optionally create a `.env.local` in the project root to override the backend URL:
+
+```env
+VITE_API_URL=http://localhost:5000
+```
+
+## API Keys
+
+| Key | Where to get it |
+|---|---|
+| `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
+| `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
+| `SERP_API_KEY` | [serpapi.com](https://serpapi.com) |
+| `WEATHER_API_KEY` | [weatherapi.com](https://www.weatherapi.com) |
+
+## Scripts
+
+```bash
+npm run dev       # Start Vite dev server
+npm run build     # Build for production (outputs to dist/)
+npm run preview   # Preview production build
+npm run lint      # Run ESLint
+```
+
+## Production Deployment
+
+```bash
+# Build the frontend
+npm run build
+
+# Serve the dist/ folder via nginx or a CDN
+
+# Run backend with Gunicorn
+gunicorn -w 4 src.backend.main:app
+```
+
+## License
+
+MIT
