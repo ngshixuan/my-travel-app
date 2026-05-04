@@ -62,37 +62,6 @@ weather_function = {
     },
 }
 
-def handle_tool_calls(message):
-    responses = []
-    for tool_call in message.tool_calls:
-        if tool_call.function.name == "get_ticket_details":
-            arguments = json.loads(tool_call.function.arguments)
-            origin_city = arguments.get("origin_city")
-            destination_city = arguments.get("destination_city")
-            trip_type = arguments.get("trip-type")
-            outbound_date = arguments.get("outbound_date")
-            return_date = arguments.get("return_date")
-
-            ticket_details = get_ticket_details(origin_city, destination_city, outbound_date, return_date, trip_type)
-            responses.append({
-                "role": "tool",
-                "content": ticket_details,
-                "tool_call_id": tool_call.id
-            })
-
-        elif tool_call.function.name == 'get_weather':
-            arguments= json.loads(tool_call.function.arguments)
-            city = arguments.get('city')
-            date = arguments.get('date')
-
-            weather = get_weather(city, date)
-            responses.append({
-                "role": "tool",
-                "content": weather,
-                "tool_call_id": tool_call.id
-            })
-    return responses
-
 def get_ticket_details(origin_city, destination_city, outbound_date, return_date, trip_type):
     trip_type = trip_type or "1"
     

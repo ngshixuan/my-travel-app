@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
-from tools import price_function, weather_function, handle_tool_calls
+from tools import price_function, weather_function, get_ticket_details, get_weather
 from prompts import SYSTEM_PROMPT
 
 load_dotenv(override=True)
@@ -69,74 +69,100 @@ def handle_chat_request():
 
     messages.append({"role": "user", "content": query})
 
-    def complete(msgs):
-        if 'gemini' in model_id:
-            return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools)
-        return claude.chat.completions.create(model="claude-sonnet-4-6", messages=msgs, tools=tools)
-
     def complete_stream(msgs):
         if 'gemini' in model_id:
             return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools, stream=True)
         return claude.chat.completions.create(model="claude-sonnet-4-6", messages=msgs, tools=tools, stream=True)
 
-    try:
-        response = complete(messages)
-
-        while response.choices[0].finish_reason == "tool_calls":
-            message = response.choices[0].message
-            responses = handle_tool_calls(message)
-            messages.append(message)
-            messages.extend(responses)
-            response = complete(messages)
-
-        # Extract card from the already-fetched non-streaming response
-        full_text = response.choices[0].message.content or ""
-        card = None
-        card_match = re.search(r'TRIP_CARD:(\{.*\})', full_text, re.DOTALL)
-        if card_match:
-            try:
-                card = json.loads(card_match.group(1))
-            except Exception:
-                pass
-
-        def generate():
+    def generate():
+        try:
+            current_messages = list(messages)
             marker = "TRIP_CARD:"
-            buffer = ""
-            stop_streaming = False
 
-            if card:
-                yield f"data: {json.dumps({'card': card})}\n\n"
+            while True:
+                accumulated_tool_calls = {}
+                content_buffer = ""
+                yielded_up_to = 0
+                stop_content = False
+                finish_reason = None
 
-            for chunk in complete_stream(messages):
-                if stop_streaming:
+                for chunk in complete_stream(current_messages):
+                    choice = chunk.choices[0]
+                    if choice.finish_reason:
+                        finish_reason = choice.finish_reason
+
+                    delta = choice.delta
+
+                    if delta.content:
+                        content_buffer += delta.content.replace('\r\n', '\n').replace('\r', '\n')
+                        if stop_content:
+                            continue
+                        pos = content_buffer.find(marker)
+                        if pos != -1:
+                            new_text = content_buffer[yielded_up_to:pos]
+                            if new_text:
+                                yield f"data: {json.dumps({'token': new_text})}\n\n"
+                            stop_content = True
+                        else:
+                            safe_end = max(yielded_up_to, len(content_buffer) - len(marker))
+                            new_text = content_buffer[yielded_up_to:safe_end]
+                            if new_text:
+                                yield f"data: {json.dumps({'token': new_text})}\n\n"
+                                yielded_up_to = safe_end
+
+                    if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                        for tc_chunk in delta.tool_calls:
+                            idx = tc_chunk.index
+                            if idx not in accumulated_tool_calls:
+                                accumulated_tool_calls[idx] = {"id": "", "type": "function", "function": {"name": "", "arguments": ""}}
+                            if tc_chunk.id:
+                                accumulated_tool_calls[idx]["id"] = tc_chunk.id
+                            if tc_chunk.function:
+                                if tc_chunk.function.name:
+                                    accumulated_tool_calls[idx]["function"]["name"] += tc_chunk.function.name
+                                if tc_chunk.function.arguments:
+                                    accumulated_tool_calls[idx]["function"]["arguments"] += tc_chunk.function.arguments
+
+                if finish_reason == "tool_calls":
+                    if not stop_content and len(content_buffer) > yielded_up_to:
+                        tail = content_buffer[yielded_up_to:]
+                        print("=== TOOL CALL TAIL ===", repr(tail))
+                        yield f"data: {json.dumps({'token': tail})}\n\n"
+
+                    tool_call_list = [accumulated_tool_calls[i] for i in sorted(accumulated_tool_calls.keys())]
+                    current_messages.append({"role": "assistant", "content": None, "tool_calls": tool_call_list})
+
+                    for tc in tool_call_list:
+                        name = tc["function"]["name"]
+                        args = json.loads(tc["function"]["arguments"])
+                        if name == "get_ticket_details":
+                            result = get_ticket_details(args.get("origin_city"), args.get("destination_city"), args.get("outbound_date"), args.get("return_date"), args.get("trip-type"))
+                        elif name == "get_weather":
+                            result = get_weather(args.get("city"), args.get("date"))
+                        else:
+                            result = json.dumps({"error": f"Unknown tool: {name}"})
+                        current_messages.append({"role": "tool", "content": result, "tool_call_id": tc["id"]})
+                else:
+                    if not stop_content and len(content_buffer) > yielded_up_to:
+                        yield f"data: {json.dumps({'token': content_buffer[yielded_up_to:]})}\n\n"
+
+                    card_match = re.search(r'TRIP_CARD:(\{.*\})', content_buffer, re.DOTALL)
+                    if card_match:
+                        try:
+                            yield f"data: {json.dumps({'card': json.loads(card_match.group(1))})}\n\n"
+                        except Exception:
+                            pass
                     break
-                delta = chunk.choices[0].delta.content or ""
-                if not delta:
-                    continue
-
-                buffer += delta
-                pos = buffer.find(marker)
-                if pos != -1:
-                    text_before = buffer[:pos]
-                    if text_before:
-                        yield f"data: {json.dumps({'token': text_before})}\n\n"
-                    stop_streaming = True
-                elif len(buffer) > len(marker):
-                    safe = buffer[:-len(marker)]
-                    yield f"data: {json.dumps({'token': safe})}\n\n"
-                    buffer = buffer[-len(marker):]
-
-            if not stop_streaming and buffer:
-                yield f"data: {json.dumps({'token': buffer})}\n\n"
 
             yield "data: [DONE]\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
 
-        resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
-        resp.headers["Cache-Control"] = "no-cache"
-        resp.headers["X-Accel-Buffering"] = "no"
-        return resp
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
 if __name__ == "__main__":
     app.run(port=5000, debug=False)

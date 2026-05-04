@@ -21,6 +21,7 @@ export default function LandingPage() {
     const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
+    const [generatingCard, setGeneratingCard] = useState(false);
     const [heroCard, setHeroCard] = useState({
         city: "Kyoto",
         country: "Japan",
@@ -80,6 +81,7 @@ export default function LandingPage() {
         setMessages((prev) => [...prev, { role: "user", text: userText }]);
         setQuery("");
         setLoading(true);
+        setGeneratingCard(true);
         try {
             const apiUrl =
                 import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -134,7 +136,7 @@ export default function LandingPage() {
                                 ]);
                             }
                         }
-                        if (parsed.card) setHeroCard(parsed.card);
+                        if (parsed.card) { setHeroCard(parsed.card); setGeneratingCard(false); }
                     } catch {
                         // ignore malformed SSE lines
                     }
@@ -152,6 +154,7 @@ export default function LandingPage() {
             ]);
         } finally {
             setLoading(false);
+            setGeneratingCard(false);
         }
     };
 
@@ -406,52 +409,66 @@ export default function LandingPage() {
                     style={{ transitionDelay: "400ms" }}
                 >
                     {/* Main card */}
-                    <div className="hero-main-card">
-                        <div>
-                            <div className="hero-main-card-emoji">
-                                {heroCard.emoji}
-                            </div>
-                            <div className="hero-card-city">
-                                {heroCard.city}
-                            </div>
-                            <div className="hero-card-country">
-                                {heroCard.country} · {heroCard.days} days
-                            </div>
-                            <div className="hero-card-tags">
-                                {heroCard.tags.map((t) => (
-                                    <span key={t} className="hero-card-tag">
-                                        {t}
-                                    </span>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="hero-card-divider" />
-                        <div>
-                            <div className="hero-ai-label">
-                                AI generated plan
-                            </div>
-                            <div className="hero-ai-items">
-                                {heroCard.highlights.map((item) => (
-                                    <div
-                                        key={item.day}
-                                        className="hero-ai-item"
-                                    >
-                                        <span className="hero-ai-day">
-                                            {item.day}
-                                        </span>
-                                        <span className="hero-ai-activity">
-                                            {item.activity}
-                                        </span>
+                    <div key={heroCard.city} className="hero-main-card">
+                        {generatingCard ? (
+                            <>
+                                <div>
+                                    <div className="card-skel" style={{ width: 48, height: 48, borderRadius: 10, marginBottom: 14 }} />
+                                    <div className="card-skel" style={{ width: "65%", height: 34, marginBottom: 8 }} />
+                                    <div className="card-skel" style={{ width: "42%", height: 12, marginBottom: 18 }} />
+                                    <div style={{ display: "flex", gap: 6 }}>
+                                        <div className="card-skel" style={{ width: 58, height: 22, borderRadius: 100 }} />
+                                        <div className="card-skel" style={{ width: 68, height: 22, borderRadius: 100 }} />
+                                        <div className="card-skel" style={{ width: 50, height: 22, borderRadius: 100 }} />
                                     </div>
-                                ))}
-                            </div>
-                        </div>
+                                </div>
+                                <div className="hero-card-divider" />
+                                <div>
+                                    <div className="card-skel" style={{ width: "35%", height: 10, marginBottom: 14 }} />
+                                    <div className="hero-ai-items">
+                                        {[55, 70, 45, 65, 50].map((w, i) => (
+                                            <div key={i} className="hero-ai-item">
+                                                <div className="card-skel" style={{ width: 52, height: 20, borderRadius: 100, flexShrink: 0 }} />
+                                                <div className="card-skel" style={{ width: `${w}%`, height: 12 }} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <div>
+                                    <div className="hero-main-card-emoji">{heroCard.emoji}</div>
+                                    <div className="hero-card-city">{heroCard.city}</div>
+                                    <div className="hero-card-country">{heroCard.country} · {heroCard.days} days</div>
+                                    <div className="hero-card-tags">
+                                        {heroCard.tags.map((t) => (
+                                            <span key={t} className="hero-card-tag">{t}</span>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div className="hero-card-divider" />
+                                <div>
+                                    <div className="hero-ai-label">AI generated plan</div>
+                                    <div className="hero-ai-items">
+                                        {heroCard.highlights.map((item) => (
+                                            <div key={item.day} className="hero-ai-item">
+                                                <span className="hero-ai-day">{item.day}</span>
+                                                <span className="hero-ai-activity">{item.activity}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                     {/* Price badge */}
                     <div className="hero-price-badge">
                         <div className="hero-price-label">estimated budget</div>
                         <div className="hero-price-value">
-                            {heroCard.budget}
+                            {generatingCard
+                                ? <div className="card-skel card-skel--badge" />
+                                : heroCard.budget}
                         </div>
                     </div>
                 </div>
