@@ -17,7 +17,7 @@ export default function LandingPage() {
     const [chatVisible, setChatVisible] = useState(false);
     const [visibleMsgs, setVisibleMsgs] = useState(1);
     const [heroVisible, setHeroVisible] = useState(false);
-    const [selectedModel, setSelectedModel] = useState(LLM_MODELS[1]);
+    const [selectedModel, setSelectedModel] = useState(LLM_MODELS[0]);
     const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -242,7 +242,9 @@ export default function LandingPage() {
                                     >
                                         {msg.role === "ai" ? (
                                             <div className="md">
-                                                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                                <ReactMarkdown
+                                                    remarkPlugins={[remarkGfm]}
+                                                >
                                                     {msg.text}
                                                 </ReactMarkdown>
                                             </div>
