@@ -6,6 +6,8 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from tools import price_function, weather_function, get_ticket_details, get_weather
 from prompts import SYSTEM_PROMPT
 
@@ -39,7 +41,15 @@ app = Flask(__name__)
 cors_origins = os.getenv('FRONTEND_URL', 'http://localhost:5173').split(',')
 CORS(app, origins=cors_origins)
 
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=[],
+    storage_uri="memory://",
+)
+
 @app.route("/chat", methods=['POST'])
+@limiter.limit("10 per minute")
 def handle_chat_request():
     body = request.get_json()
     query = body.get("query", "").strip()
@@ -49,6 +59,10 @@ def handle_chat_request():
 
     if not query:
         return jsonify({"error": "query is required"}), 400
+    if len(query) > 2000:
+        return jsonify({"error": "Query is too long (max 2000 characters)"}), 400
+    if len(history) > 100:
+        return jsonify({"error": "Conversation history is too long"}), 400
 
     location_context = ""
     if location:

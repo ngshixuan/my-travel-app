@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./App.css";
@@ -11,6 +11,34 @@ import {
     LLM_MODELS,
 } from "./data";
 
+const DEFAULT_HERO_CARD = {
+    city: "Kyoto",
+    country: "Japan",
+    emoji: "⛩️",
+    days: 12,
+    tags: ["Temples", "Cuisine", "Gardens"],
+    highlights: [
+        { day: "Day 1–2", activity: "Fushimi Inari & Gion" },
+        { day: "Day 3–4", activity: "Arashiyama & tea ceremony" },
+        { day: "Day 5", activity: "Nishiki Market food tour" },
+        { day: "Day 6–8", activity: "Philosopher's Path & Nanzenji" },
+        { day: "Day 9–12", activity: "Day trip to Nara & Osaka" },
+    ],
+    budget: "$2,840",
+};
+
+const ChatMessage = React.memo(({ msg }) => (
+    <div className={`hero-thread-bubble hero-thread-bubble--${msg.role}`}>
+        {msg.role === "ai" ? (
+            <div className="md">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.text}</ReactMarkdown>
+            </div>
+        ) : (
+            msg.text
+        )}
+    </div>
+));
+
 export default function LandingPage() {
     const [query, setQuery] = useState("");
     const [activeChip, setActiveChip] = useState(null);
@@ -22,21 +50,11 @@ export default function LandingPage() {
     const [messages, setMessages] = useState([]);
     const [loading, setLoading] = useState(false);
     const [generatingCard, setGeneratingCard] = useState(false);
-    const [heroCard, setHeroCard] = useState({
-        city: "Kyoto",
-        country: "Japan",
-        emoji: "⛩️",
-        days: 12,
-        tags: ["Temples", "Cuisine", "Gardens"],
-        highlights: [
-            { day: "Day 1–2", activity: "Fushimi Inari & Gion" },
-            { day: "Day 3–4", activity: "Arashiyama & tea ceremony" },
-            { day: "Day 5", activity: "Nishiki Market food tour" },
-            { day: "Day 6–8", activity: "Philosopher's Path & Nanzenji" },
-            { day: "Day 9–12", activity: "Day trip to Nara & Osaka" },
-        ],
-        budget: "$2,840",
-    });
+    const [heroCard, setHeroCard] = useState(DEFAULT_HERO_CARD);
+    const [heroCardVersion, setHeroCardVersion] = useState(0);
+    const [copied, setCopied] = useState(false);
+    const [lastUserMsg, setLastUserMsg] = useState(null);
+    const [demoInput, setDemoInput] = useState("");
 
     const chatRef = useRef(null);
     const modelSelectorRef = useRef(null);
@@ -75,9 +93,13 @@ export default function LandingPage() {
         el.style.height = `${el.scrollHeight}px`;
     }, [query]);
 
-    const handleLLMCall = async () => {
-        if (!query.trim() || loading) return;
-        const userText = query.trim();
+    // overrideText: optional text to send instead of the query state
+    // historyOverride: optional history to use instead of messages state (for retry)
+    const handleLLMCall = async (overrideText, historyOverride) => {
+        const userText = (overrideText !== undefined ? overrideText : query).trim();
+        if (!userText || loading) return;
+        const currentHistory = historyOverride !== undefined ? historyOverride : messages;
+        setLastUserMsg(userText);
         setMessages((prev) => [...prev, { role: "user", text: userText }]);
         setQuery("");
         setLoading(true);
@@ -91,7 +113,7 @@ export default function LandingPage() {
                 body: JSON.stringify({
                     query: userText,
                     model_id: selectedModel.id,
-                    history: messages,
+                    history: currentHistory.filter((m) => !m.isError),
                     location: location,
                 }),
             });
@@ -107,7 +129,7 @@ export default function LandingPage() {
 
                 buffer += decoder.decode(value, { stream: true });
                 const lines = buffer.split("\n");
-                buffer = lines.pop(); // keep incomplete line for next chunk
+                buffer = lines.pop();
 
                 for (const line of lines) {
                     if (!line.startsWith("data: ")) continue;
@@ -136,26 +158,68 @@ export default function LandingPage() {
                                 ]);
                             }
                         }
-                        if (parsed.card) { setHeroCard(parsed.card); setGeneratingCard(false); }
+                        if (parsed.card) {
+                            setHeroCard(parsed.card);
+                            setHeroCardVersion((v) => v + 1);
+                            setGeneratingCard(false);
+                        }
                     } catch {
                         // ignore malformed SSE lines
                     }
                 }
             }
 
-            // Fallback: if we never got a token, add an empty message
             if (firstToken) {
                 setMessages((prev) => [...prev, { role: "ai", text: "" }]);
             }
         } catch {
             setMessages((prev) => [
                 ...prev,
-                { role: "ai", text: "Something went wrong. Please try again." },
+                { role: "ai", text: "Something went wrong. Please try again.", isError: true },
             ]);
         } finally {
             setLoading(false);
             setGeneratingCard(false);
         }
+    };
+
+    const handleRetry = () => {
+        if (!lastUserMsg) return;
+        const cleanHistory = messages.slice(0, -2);
+        setMessages(cleanHistory);
+        handleLLMCall(lastUserMsg, cleanHistory);
+    };
+
+    const handleNewTrip = () => {
+        setMessages([]);
+        setQuery("");
+        setHeroCard(DEFAULT_HERO_CARD);
+        setHeroCardVersion(0);
+        setLastUserMsg(null);
+        setActiveChip(null);
+    };
+
+    const handleCopyCard = async () => {
+        const text = [
+            `${heroCard.emoji} ${heroCard.city}, ${heroCard.country} — ${heroCard.days} days`,
+            `Tags: ${heroCard.tags.join(", ")}`,
+            "",
+            "AI Generated Plan:",
+            ...heroCard.highlights.map((h) => `${h.day}: ${h.activity}`),
+            "",
+            `Estimated budget: ${heroCard.budget}`,
+        ].join("\n");
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
+    const handleDemoSearch = () => {
+        const text = demoInput.trim();
+        if (text) setQuery(text);
+        setDemoInput("");
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(() => searchInputRef.current?.focus(), 500);
     };
 
     useEffect(() => {
@@ -229,45 +293,49 @@ export default function LandingPage() {
             <section className="hero-section">
                 <div>
                     {messages.length > 0 || loading ? (
-                        <div className="hero-thread" ref={heroThreadRef}>
-                            {messages.map((msg, i) => (
-                                <div
-                                    key={i}
-                                    className={`hero-thread-msg${msg.role === "user" ? " hero-thread-msg--user" : ""}`}
+                        <>
+                            <div className="hero-thread-topbar">
+                                <button
+                                    className="new-trip-btn"
+                                    onClick={handleNewTrip}
                                 >
-                                    {msg.role === "ai" && (
-                                        <div className="hero-thread-avatar">
-                                            ✦
-                                        </div>
-                                    )}
+                                    ← New trip
+                                </button>
+                            </div>
+                            <div className="hero-thread" ref={heroThreadRef}>
+                                {messages.map((msg, i) => (
                                     <div
-                                        className={`hero-thread-bubble hero-thread-bubble--${msg.role}`}
+                                        key={i}
+                                        className={`hero-thread-msg${msg.role === "user" ? " hero-thread-msg--user" : ""}`}
                                     >
-                                        {msg.role === "ai" ? (
-                                            <div className="md">
-                                                <ReactMarkdown
-                                                    remarkPlugins={[remarkGfm]}
-                                                >
-                                                    {msg.text}
-                                                </ReactMarkdown>
-                                            </div>
-                                        ) : (
-                                            msg.text
+                                        {msg.role === "ai" && (
+                                            <div className="hero-thread-avatar">✦</div>
                                         )}
+                                        <div className="hero-thread-msg-inner">
+                                            <ChatMessage msg={msg} />
+                                            {msg.isError && (
+                                                <button
+                                                    className="retry-btn"
+                                                    onClick={handleRetry}
+                                                >
+                                                    ↻ Retry
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                            {loading && (
-                                <div className="hero-thread-msg">
-                                    <div className="hero-thread-avatar">✦</div>
-                                    <div className="hero-thread-bubble hero-thread-bubble--ai hero-thread-typing">
-                                        <span className="ai-reply-dot" />
-                                        <span className="ai-reply-dot" />
-                                        <span className="ai-reply-dot" />
+                                ))}
+                                {loading && (
+                                    <div className="hero-thread-msg">
+                                        <div className="hero-thread-avatar">✦</div>
+                                        <div className="hero-thread-bubble hero-thread-bubble--ai hero-thread-typing">
+                                            <span className="ai-reply-dot" />
+                                            <span className="ai-reply-dot" />
+                                            <span className="ai-reply-dot" />
+                                        </div>
                                     </div>
-                                </div>
-                            )}
-                        </div>
+                                )}
+                            </div>
+                        </>
                     ) : (
                         <div className="headings">
                             <div
@@ -335,6 +403,12 @@ export default function LandingPage() {
                                     onClick={() =>
                                         setModelDropdownOpen((o) => !o)
                                     }
+                                    onKeyDown={(e) => {
+                                        if (e.key === "Escape") setModelDropdownOpen(false);
+                                        if (e.key === "ArrowDown") { e.preventDefault(); setModelDropdownOpen(true); }
+                                    }}
+                                    aria-haspopup="listbox"
+                                    aria-expanded={modelDropdownOpen}
                                 >
                                     <span className="model-selector-icon">
                                         {selectedModel.icon}
@@ -347,14 +421,19 @@ export default function LandingPage() {
                                     </span>
                                 </button>
                                 {modelDropdownOpen && (
-                                    <div className="model-dropdown">
+                                    <div className="model-dropdown" role="listbox">
                                         {LLM_MODELS.map((model) => (
                                             <button
                                                 key={model.id}
+                                                role="option"
+                                                aria-selected={selectedModel.id === model.id}
                                                 className={`model-option${selectedModel.id === model.id ? " model-option--active" : ""}`}
                                                 onClick={() => {
                                                     setSelectedModel(model);
                                                     setModelDropdownOpen(false);
+                                                }}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === "Escape") setModelDropdownOpen(false);
                                                 }}
                                             >
                                                 <span className="model-option-icon">
@@ -380,7 +459,7 @@ export default function LandingPage() {
                                 )}
                             </div>
                             <button
-                                onClick={handleLLMCall}
+                                onClick={() => handleLLMCall()}
                                 className="cta-btn cta-btn--search"
                             >
                                 {messages.length > 0
@@ -393,7 +472,10 @@ export default function LandingPage() {
                                 <button
                                     key={i}
                                     className={`chip-btn${activeChip === i ? " chip-btn--active" : ""}`}
-                                    onClick={() => setActiveChip(i)}
+                                    onClick={() => {
+                                        setActiveChip(i);
+                                        handleLLMCall(c.label);
+                                    }}
                                 >
                                     <span className="chip-icon">{c.icon}</span>
                                     {c.label}
@@ -409,7 +491,7 @@ export default function LandingPage() {
                     style={{ transitionDelay: "400ms" }}
                 >
                     {/* Main card */}
-                    <div key={heroCard.city} className="hero-main-card">
+                    <div key={heroCardVersion} className="hero-main-card">
                         {generatingCard ? (
                             <>
                                 <div>
@@ -437,6 +519,13 @@ export default function LandingPage() {
                             </>
                         ) : (
                             <>
+                                <button
+                                    className="card-copy-btn"
+                                    onClick={handleCopyCard}
+                                    title="Copy itinerary"
+                                >
+                                    {copied ? "✓" : "⎘"}
+                                </button>
                                 <div>
                                     <div className="hero-main-card-emoji">{heroCard.emoji}</div>
                                     <div className="hero-card-city">{heroCard.city}</div>
@@ -510,6 +599,7 @@ export default function LandingPage() {
                             key={d.city}
                             className={`dest-card${i === 0 ? " dest-card--featured" : ""}`}
                             style={{ background: d.gradient }}
+                            onClick={() => handleLLMCall(`Plan a trip to ${d.city}, ${d.country}`)}
                         >
                             <div
                                 className={`dest-card-emoji${i === 0 ? " dest-card-emoji--featured" : ""}`}
@@ -614,9 +704,19 @@ export default function LandingPage() {
                         <div className="chat-input-row">
                             <input
                                 className="chat-input"
-                                placeholder="Ask a follow-up..."
+                                placeholder="Try it — type your dream trip..."
+                                value={demoInput}
+                                onChange={(e) => setDemoInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleDemoSearch();
+                                }}
                             />
-                            <button className="chat-send-btn">↑</button>
+                            <button
+                                className="chat-send-btn"
+                                onClick={handleDemoSearch}
+                            >
+                                ↑
+                            </button>
                         </div>
                     </div>
                 </div>
