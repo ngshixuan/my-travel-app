@@ -123,15 +123,15 @@ export const chatMessages = [
 export const LLM_MODELS = [
     {
         id: "claude",
-        name: "Claude Sonnet 4.6",
-        shortName: "Sonnet 4.6",
+        name: "Claude Sonnet 5",
+        shortName: "Sonnet 5",
         provider: "Anthropic",
         icon: "◆",
     },
     {
         id: "gemini",
-        name: "Gemini 3.0 Flash",
-        shortName: "Gemini 3 Flash",
+        name: "Gemini 3.5 Flash",
+        shortName: "Gemini 3.5 Flash",
         provider: "Google",
         icon: "✦",
     },

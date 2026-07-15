@@ -81,8 +81,8 @@ def handle_chat_request():
     def complete_stream(msgs):
         tools = mcp_client.get_openai_tools()
         if 'gemini' in model_id:
-            return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools, stream=True)
-        return claude.chat.completions.create(model="claude-sonnet-4-6", messages=msgs, tools=tools, stream=True)
+            return gemini.chat.completions.create(model="gemini-flash-latest", messages=msgs, tools=tools, stream=True)
+        return claude.chat.completions.create(model="claude-sonnet-5", messages=msgs, tools=tools, stream=True)
 
     def generate():
         try:
