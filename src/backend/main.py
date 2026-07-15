@@ -8,7 +8,7 @@ from flask import Flask, request, jsonify, Response, stream_with_context
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
-from tools import price_function, weather_function, get_ticket_details, get_weather
+from mcp_client import mcp_client
 from prompts import SYSTEM_PROMPT
 
 load_dotenv(override=True)
@@ -31,11 +31,6 @@ else:
 
 gemini = OpenAI(base_url=google_base_url, api_key=google_api_key)
 claude = OpenAI(base_url=anthropic_base_url, api_key=anthropic_api_key)
-
-tools = [
-    {"type": "function", "function": price_function},
-    {"type": "function", "function": weather_function}
-]
 
 app = Flask(__name__)
 cors_origins = os.getenv('FRONTEND_URL', 'http://localhost:5173').split(',')
@@ -84,6 +79,7 @@ def handle_chat_request():
     messages.append({"role": "user", "content": query})
 
     def complete_stream(msgs):
+        tools = mcp_client.get_openai_tools()
         if 'gemini' in model_id:
             return gemini.chat.completions.create(model="gemini-3-flash-preview", messages=msgs, tools=tools, stream=True)
         return claude.chat.completions.create(model="claude-sonnet-4-6", messages=msgs, tools=tools, stream=True)
@@ -149,12 +145,10 @@ def handle_chat_request():
                     for tc in tool_call_list:
                         name = tc["function"]["name"]
                         args = json.loads(tc["function"]["arguments"])
-                        if name == "get_ticket_details":
-                            result = get_ticket_details(args.get("origin_city"), args.get("destination_city"), args.get("outbound_date"), args.get("return_date"), args.get("trip-type"))
-                        elif name == "get_weather":
-                            result = get_weather(args.get("city"), args.get("date"))
-                        else:
-                            result = json.dumps({"error": f"Unknown tool: {name}"})
+                        try:
+                            result = mcp_client.call_tool(name, args)
+                        except Exception as tool_error:
+                            result = json.dumps({"error": f"Tool '{name}' failed: {tool_error}"})
                         current_messages.append({"role": "tool", "content": result, "tool_call_id": tc["id"]})
                 else:
                     if not stop_content and len(content_buffer) > yielded_up_to:

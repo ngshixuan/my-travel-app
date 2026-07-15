@@ -62,7 +62,7 @@ weather_function = {
     },
 }
 
-def get_ticket_details(origin_city, destination_city, outbound_date, return_date, trip_type):
+def get_ticket_details(origin_city, destination_city, outbound_date, return_date=None, trip_type="1"):
     trip_type = trip_type or "1"
     
     print(f"Tool called for city {origin_city} to {destination_city} and {trip_type} at {outbound_date}")
